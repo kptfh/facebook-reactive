@@ -19,6 +19,7 @@ import com.restfb.scope.ScopeBuilder;
 import com.restfb.types.DeviceCode;
 import com.restfb.util.StringUtils;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -336,7 +337,8 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
 
     Mono<ReactiveHttpResponse> response = webRequestor.executeGet(url, returnType, objectReader);
 
-    Mono<T> result = processErrors(response).flatMap(reactiveHttpResponse -> (Mono<T>) reactiveHttpResponse.body());
+    Mono<T> result = Mono.from(processErrors(response).flatMapMany(
+            reactiveHttpResponse -> (Publisher<T>)reactiveHttpResponse.body()));
     return new TraceableResult<>(result, url);
   }
 
@@ -372,8 +374,8 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
                                     Class<T> returnType,
                                     final List<BinaryAttachment> binaryAttachments,
                                     Parameter... parameters) {
-    return makePostRequest(endpoint, Mono.class, returnType, binaryAttachments, parameters)
-            .flatMap(reactiveHttpResponse -> (Mono<T>)reactiveHttpResponse.body());
+    return Mono.from(makePostRequest(endpoint, Mono.class, returnType, binaryAttachments, parameters)
+            .flatMapMany(reactiveHttpResponse -> (Publisher<T>)reactiveHttpResponse.body()));
   }
 
   protected <T> Flux<T> makePostRequestFlux(String endpoint,
@@ -553,7 +555,8 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
 
     return makePostRequest("device/login", DeviceCode.class, null,
             Parameter.with("type", "device_code"),
-            Parameter.with("scope", scope.toString()));
+            Parameter.with("scope", scope.toString())
+    );
   }
 
   @Override
@@ -589,7 +592,7 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
     return new Builder(version);
   }
 
-  private static class Builder{
+  public static class Builder{
     private final Version version;
     private HttpClient httpClient;
     private String accessToken;
@@ -644,7 +647,7 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
     public DefaultReactiveFacebookClient build(){
 
       if(httpClient == null){
-        httpClient = new HttpClient();
+        httpClient = new HttpClient(new SslContextFactory());
         try {
           httpClient.start();
         } catch (Exception e) {
