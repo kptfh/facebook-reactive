@@ -3,6 +3,7 @@ package reactivefb;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.async_.JsonFactory;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -19,6 +20,7 @@ import com.restfb.scope.ScopeBuilder;
 import com.restfb.types.DeviceCode;
 import com.restfb.util.StringUtils;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.WWWAuthenticationProtocolHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -367,7 +369,8 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
     final String parameterString = utilityFacebookClient.toParameterString(parameters);
 
     Mono<ReactiveHttpResponse> response = webRequestor.executeDelete(fullEndpoint + "?" + parameterString, returnType);
-    return processErrors(response).flatMap(reactiveHttpResponse -> (Mono<T>)reactiveHttpResponse.body());
+    return Mono.from(processErrors(response)
+            .flatMapMany(reactiveHttpResponse -> (Publisher<T>)reactiveHttpResponse.body()));
   }
 
   protected <T> Mono<T> makePostRequest(String endpoint,
@@ -650,6 +653,7 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
         httpClient = new HttpClient(new SslContextFactory());
         try {
           httpClient.start();
+          httpClient.getProtocolHandlers().remove(WWWAuthenticationProtocolHandler.NAME);
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
@@ -659,6 +663,7 @@ public class DefaultReactiveFacebookClient implements ReactiveFacebookClient {
         objectMapper = new ObjectMapper();
         objectMapper.setPropertyNamingStrategy(FACEBOOK_NAMING_STRATEGY);
         objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
       }
 
       if(webRequestor == null){

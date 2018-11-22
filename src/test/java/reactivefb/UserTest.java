@@ -1,24 +1,44 @@
 package reactivefb;
 
+import com.restfb.Parameter;
 import com.restfb.Version;
+import com.restfb.types.TestUser;
 import org.junit.Test;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
-import static com.restfb.FacebookClient.AccessToken;
 import static org.assertj.core.api.Assertions.assertThat;
+import static reactivefb.ApplicationTest.getAppAccessToken;
+import static reactivefb.ApplicationTest.getAppId;
+import static reactivefb.ApplicationTest.getVersion;
+import static reactivefb.Parameters.ACCESS_TOKEN;
+import static reactivefb.Parameters.INSTALLED;
 
 public class UserTest {
 
-    private static final String appId = "371017066972600";
-    private static final String appSecret = "990f893fcd3bd433131d981838bdc0cc";
-    private static final String appAccessToken = "371017066972600|1T2pBN_RqbGs05ecz63RSYOXreo";
-
-    DefaultReactiveFacebookClient rootFacebookClient
-            = DefaultReactiveFacebookClient.builder(Version.VERSION_2_9).build();
+    private static DefaultReactiveFacebookClient appFacebookClient
+            = DefaultReactiveFacebookClient.builder(getVersion())
+            .setAccessToken(getAppAccessToken())
+            .build();
 
     @Test
-    public void shouldObtainAppAccessToken(){
-//        AccessToken accessToken = rootFacebookClient.obtainDeviceAccessToken()o(appId, appSecret).block();
-//        assertThat(accessToken.getAccessToken()).isEqualTo(appAccessToken);
+    public void shouldCreateAndDeleteTestUser(){
+        Mono<Boolean> deleted = createTestUser()
+                .flatMap(testUser -> deleteTestUser(testUser));
+
+        StepVerifier.create(deleted)
+                .assertNext(result -> assertThat(result).isTrue())
+                .verifyComplete();
     }
+
+    public static Mono<Boolean> deleteTestUser(TestUser testUser) {
+        return appFacebookClient.deleteObject(testUser.getId());
+    }
+
+    public static Mono<TestUser> createTestUser() {
+        return appFacebookClient.publish(getAppId()+"/accounts/test-users", TestUser.class,
+                Parameter.with(INSTALLED, "true"));
+    }
+
 
 }

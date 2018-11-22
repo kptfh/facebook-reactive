@@ -80,9 +80,10 @@ public class DefaultReactiveWebRequestor implements ReactiveWebRequestor{
             ReactiveHttpRequest postRequest = new ReactiveHttpRequest("post", new URI(url), emptyMap(),
                     Mono.just(parameters));
 
-            return new JettyReactiveHttpClient(httpClient, String.class, responsePublisherType, responseBodyType,
-                    jsonFactory, null, objectMapper.readerFor(responseBodyType))
-                    .executeRequest(postRequest);
+            JettyReactiveHttpClient jettyReactiveHttpClient = new JettyReactiveHttpClient(httpClient, String.class, responsePublisherType, responseBodyType,
+                    jsonFactory, null, objectMapper.readerFor(responseBodyType));
+
+            return Mono.defer(() -> jettyReactiveHttpClient.executeRequest(postRequest));
         } catch (URISyntaxException e) {
             return Mono.error(e);
         }
